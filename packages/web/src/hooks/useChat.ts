@@ -8,6 +8,7 @@ import {
   Chat,
   ListChatsResponse,
   Role,
+  Model,
 } from 'generative-ai-use-cases-jp';
 import { useEffect, useMemo } from 'react';
 import { v4 as uuid } from 'uuid';
@@ -38,6 +39,7 @@ const useChatState = create<{
     content: string,
     mutateListChat: KeyedMutator<ListChatsResponse>,
     ignoreHistory: boolean,
+    model: Model,
     preProcessInput: ((message: ShownMessage[]) => ShownMessage[]) | undefined,
     postProcessOutput: ((message: string) => string) | undefined
   ) => void;
@@ -254,6 +256,7 @@ const useChatState = create<{
       content: string,
       mutateListChat,
       ignoreHistory: boolean = false,
+      model: Model,
       preProcessInput:
         | ((message: ShownMessage[]) => ShownMessage[])
         | undefined = undefined,
@@ -298,6 +301,7 @@ const useChatState = create<{
 
       // LLM へのリクエスト
       const stream = predictStream({
+        model: model,
         messages: omitUnusedMessageProperties(inputMessages),
       });
 
@@ -312,6 +316,7 @@ const useChatState = create<{
                 /(<output>|<\/output>)/g,
                 ''
               ),
+              llmType: model.modelName,
             };
             draft[id].messages.push(newAssistantMessage);
           });
@@ -441,6 +446,10 @@ const useChat = (id: string, chatId?: string) => {
     postChat: (
       content: string,
       ignoreHistory: boolean = false,
+      model: Model = {
+        type: 'bedrock',
+        modelName: 'anthropic.claude-instant-v1',
+      },
       preProcessInput:
         | ((message: ShownMessage[]) => ShownMessage[])
         | undefined = undefined,
@@ -451,6 +460,7 @@ const useChat = (id: string, chatId?: string) => {
         content,
         mutateConversations,
         ignoreHistory,
+        model,
         preProcessInput,
         postProcessOutput
       );

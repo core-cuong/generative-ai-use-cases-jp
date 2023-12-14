@@ -3,6 +3,7 @@ import useChatApi from './useChatApi';
 import useRagApi from './useRagApi';
 import { ragPrompt } from '../prompts';
 import { ShownMessage } from 'generative-ai-use-cases-jp';
+import { Model } from 'generative-ai-use-cases-jp';
 
 const useRag = (id: string) => {
   const {
@@ -25,17 +26,24 @@ const useRag = (id: string) => {
     clear,
     loading,
     messages,
-    postMessage: async (content: string) => {
+    postMessage: async (
+      content: string,
+      model: Model = {
+        type: 'bedrock',
+        modelName: 'anthropic.claude-instant-v1',
+      }
+    ) => {
       // Kendra から Retrieve する際に、ローディング表示する
       setLoading(true);
       pushMessage('user', content);
       pushMessage('assistant', '[Kendra から参照ドキュメントを取得中...]');
 
       const query = await predict({
+        model: model,
         messages: [
           {
             role: 'user',
-            content: ragPrompt({
+            content: ragPrompt.generatePrompt(model.modelName, {
               promptType: 'RETRIEVE',
               retrieveQueries: [content],
             }),
@@ -46,7 +54,7 @@ const useRag = (id: string) => {
       // Kendra から 参考ドキュメントを Retrieve してシステムコンテキストとして設定する
       const items = await retrieve(query);
       updateSystemContext(
-        ragPrompt({
+        ragPrompt.generatePrompt(model.modelName, {
           promptType: 'SYSTEM_CONTEXT',
           referenceItems: items.data.ResultItems ?? [],
         })
@@ -58,6 +66,7 @@ const useRag = (id: string) => {
       postChat(
         content,
         false,
+        model,
         (messages: ShownMessage[]) => {
           // 前処理：Few-shot で参考にされてしまうため、過去ログから footnote を削除
           return messages.map((message) => ({

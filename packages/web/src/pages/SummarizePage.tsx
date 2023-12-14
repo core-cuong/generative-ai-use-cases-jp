@@ -10,8 +10,11 @@ import useChat from '../hooks/useChat';
 import { create } from 'zustand';
 import { summarizePrompt } from '../prompts';
 import { SummarizePageLocationState } from '../@types/navigate';
+import { SelectField } from '@aws-amplify/ui-react';
 
 type StateType = {
+  modelName: string;
+  setModelName: (c: string) => void;
   sentence: string;
   setSentence: (s: string) => void;
   additionalContext: string;
@@ -23,12 +26,18 @@ type StateType = {
 
 const useSummarizePageState = create<StateType>((set) => {
   const INIT_STATE = {
+    modelName: '',
     sentence: '',
     additionalContext: '',
     summarizedSentence: '',
   };
   return {
     ...INIT_STATE,
+    setModelName: (s: string) => {
+      set(() => ({
+        modelName: s,
+      }));
+    },
     setSentence: (s: string) => {
       set(() => ({
         sentence: s,
@@ -52,6 +61,8 @@ const useSummarizePageState = create<StateType>((set) => {
 
 const SummarizePage: React.FC = () => {
   const {
+    modelName,
+    setModelName,
     sentence,
     setSentence,
     additionalContext,
@@ -63,6 +74,9 @@ const SummarizePage: React.FC = () => {
   const { state, pathname } =
     useLocation() as Location<SummarizePageLocationState>;
   const { loading, messages, postChat, clear: clearChat } = useChat(pathname);
+  const availableModels: string[] = summarizePrompt.supportedModels.map(
+    (m) => m.modelName
+  );
 
   const disabledExec = useMemo(() => {
     return sentence === '' || loading;
@@ -73,16 +87,22 @@ const SummarizePage: React.FC = () => {
       setSentence(state.sentence);
       setAdditionalContext(state.additionalContext);
     }
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [state]);
+  }, [state, setSentence, setAdditionalContext]);
 
-  const getSummary = (sentence: string, context: string) => {
+  useEffect(() => {
+    if (!modelName) {
+      setModelName(availableModels[0]);
+    }
+  }, [modelName, availableModels, setModelName]);
+
+  const getSummary = (modelName: string, sentence: string, context: string) => {
     postChat(
-      summarizePrompt({
+      summarizePrompt.generatePrompt(modelName, {
         sentence,
         context,
       }),
-      true
+      true,
+      summarizePrompt.supportedModels.find((m) => m.modelName === modelName)
     );
   };
 
@@ -101,9 +121,9 @@ const SummarizePage: React.FC = () => {
   // 要約を実行
   const onClickExec = useCallback(() => {
     if (loading) return;
-    getSummary(sentence, additionalContext);
+    getSummary(modelName, sentence, additionalContext);
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [sentence, additionalContext, loading]);
+  }, [modelName, sentence, additionalContext, loading]);
 
   // リセット
   const onClickClear = useCallback(() => {
@@ -119,6 +139,22 @@ const SummarizePage: React.FC = () => {
       </div>
       <div className="col-span-12 col-start-1 mx-2 lg:col-span-10 lg:col-start-2 xl:col-span-10 xl:col-start-2">
         <Card label="要約したい文章">
+          {availableModels.length > 1 && (
+            <div className="mb-4 flex w-full">
+              <SelectField
+                label="モデル"
+                labelHidden
+                value={modelName}
+                onChange={(e) => setModelName(e.target.value)}>
+                {availableModels.map((m) => (
+                  <option key={m} value={m}>
+                    {m}
+                  </option>
+                ))}
+              </SelectField>
+            </div>
+          )}
+
           <Textarea
             placeholder="入力してください"
             value={sentence}

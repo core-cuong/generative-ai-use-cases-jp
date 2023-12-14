@@ -17,10 +17,14 @@ import useChat from '../hooks/useChat';
 import Base64Image from '../components/Base64Image';
 import { AxiosError } from 'axios';
 import { GenerateImagePageLocationState } from '../@types/navigate';
+import { SelectField } from '@aws-amplify/ui-react';
+import { imageInput } from '../prompts';
 
 const MAX_SAMPLE = 7;
 
 type StateType = {
+  modelName: string;
+  setModelName: (c: string) => void;
   prompt: string;
   setPrompt: (s: string) => void;
   negativePrompt: string;
@@ -54,6 +58,7 @@ type StateType = {
 
 const useGenerateImagePageState = create<StateType>((set, get) => {
   const INIT_STATE = {
+    modelName: '',
     prompt: '',
     negativePrompt: '',
     stylePreset: '',
@@ -72,6 +77,11 @@ const useGenerateImagePageState = create<StateType>((set, get) => {
 
   return {
     ...INIT_STATE,
+    setModelName: (s: string) => {
+      set(() => ({
+        modelName: s,
+      }));
+    },
     setPrompt: (s) => {
       set(() => ({
         prompt: s,
@@ -186,6 +196,8 @@ const stylePresetOptions = [
 
 const GenerateImagePage: React.FC = () => {
   const {
+    modelName,
+    setModelName,
     prompt,
     setPrompt,
     negativePrompt,
@@ -221,6 +233,7 @@ const GenerateImagePage: React.FC = () => {
   const [generating, setGenerating] = useState(false);
   const [isOpenSketch, setIsOpenSketch] = useState(false);
   const [selectedImageIndex, setSelectedImageIndex] = useState(0);
+  const availableModels = imageInput.supportedModels.map((m) => m.modelName);
 
   // LandingPage のデモデータ設定
   useEffect(() => {
@@ -228,6 +241,12 @@ const GenerateImagePage: React.FC = () => {
       setChatContent(state.content);
     }
   }, [setChatContent, state]);
+
+  useEffect(() => {
+    if (!modelName) {
+      setModelName(availableModels[0]);
+    }
+  }, [modelName, availableModels, setModelName]);
 
   const generateRandomSeed = useCallback(() => {
     return Math.floor(Math.random() * 4294967295);
@@ -246,24 +265,27 @@ const GenerateImagePage: React.FC = () => {
           _seed = rand;
         }
 
-        return generate({
-          textPrompt: [
-            {
-              text: _prompt,
-              weight: 1,
-            },
-            {
-              text: _negativePrompt,
-              weight: -1,
-            },
-          ],
-          cfgScale,
-          seed: _seed,
-          step,
-          stylePreset: _stylePreset ?? stylePreset,
-          initImage: initImageBase64,
-          imageStrength: imageStrength,
-        })
+        return generate(
+          {
+            textPrompt: [
+              {
+                text: _prompt,
+                weight: 1,
+              },
+              {
+                text: _negativePrompt,
+                weight: -1,
+              },
+            ],
+            cfgScale,
+            seed: _seed,
+            step,
+            stylePreset: _stylePreset ?? stylePreset,
+            initImage: initImageBase64,
+            imageStrength: imageStrength,
+          },
+          imageInput.supportedModels.find((m) => m.modelName === modelName)
+        )
           .then((res) => {
             setImage(idx, res);
           })
@@ -278,6 +300,7 @@ const GenerateImagePage: React.FC = () => {
       });
     },
     [
+      modelName,
       cfgScale,
       clearImage,
       generate,
@@ -425,6 +448,20 @@ const GenerateImagePage: React.FC = () => {
             </Card>
 
             <Card label="パラメータ" className="mb-14 mt-8">
+              {availableModels.length > 1 && (
+                <div className="mb-4 flex w-full">
+                  <SelectField
+                    label="モデル"
+                    value={modelName}
+                    onChange={(e) => setModelName(e.target.value)}>
+                    {availableModels.map((m) => (
+                      <option key={m} value={m}>
+                        {m}
+                      </option>
+                    ))}
+                  </SelectField>
+                </div>
+              )}
               <div className="flex flex-col">
                 <div className="mb-8 flex flex-col xl:flex-row">
                   <div className="flex w-full flex-col items-center justify-center xl:w-1/2">

@@ -1,10 +1,21 @@
 import { APIGatewayProxyEvent, APIGatewayProxyResult } from 'aws-lambda';
 import {
+  Model,
   PredictTitleRequest,
   UnrecordedMessage,
 } from 'generative-ai-use-cases-jp';
 import { setChatTitle } from './repository';
 import api from './utils/api';
+
+// Title は指定したモデルの中の Claude
+const modelName: string =
+  process.env.MODEL_NAMES?.split(',')
+    .map((name) => name.trim())
+    .filter((name) => name.includes('claude'))[0] || 'anthropic.claude-v2';
+const model: Model = {
+  type: 'bedrock',
+  modelName: modelName,
+};
 
 export const handler = async (
   event: APIGatewayProxyEvent
@@ -22,7 +33,8 @@ export const handler = async (
       },
     ];
 
-    const title = (await api.invoke(messages)).replace(
+    console.log(model);
+    const title = (await api[model.type].invoke(model, messages)).replace(
       /<([^>]+)>([\s\S]*?)<\/\1>/,
       '$2'
     );

@@ -9,15 +9,25 @@ import useScroll from '../hooks/useScroll';
 import { create } from 'zustand';
 import { ReactComponent as BedrockIcon } from '../assets/bedrock.svg';
 import { ChatPageLocationState } from '../@types/navigate';
+import { SelectField } from '@aws-amplify/ui-react';
+import { chatPrompt } from '../prompts';
 
 type StateType = {
+  modelName: string;
   content: string;
+  setModelName: (c: string) => void;
   setContent: (c: string) => void;
 };
 
 const useChatPageState = create<StateType>((set) => {
   return {
+    modelName: '',
     content: '',
+    setModelName: (s: string) => {
+      set(() => ({
+        modelName: s,
+      }));
+    },
     setContent: (s: string) => {
       set(() => ({
         content: s,
@@ -27,7 +37,7 @@ const useChatPageState = create<StateType>((set) => {
 });
 
 const ChatPage: React.FC = () => {
-  const { content, setContent } = useChatPageState();
+  const { modelName, content, setModelName, setContent } = useChatPageState();
   const { state, pathname } = useLocation() as Location<ChatPageLocationState>;
   const { chatId } = useParams();
 
@@ -42,6 +52,9 @@ const ChatPage: React.FC = () => {
   } = useChat(pathname, chatId);
   const { scrollToBottom, scrollToTop } = useScroll();
   const { getConversationTitle } = useConversation();
+  const availableModels: string[] = chatPrompt.supportedModels.map(
+    (m) => m.modelName
+  );
 
   const title = useMemo(() => {
     if (chatId) {
@@ -55,15 +68,23 @@ const ChatPage: React.FC = () => {
     if (state !== null) {
       setContent(state.content);
     }
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [state]);
+  }, [state, setContent]);
+
+  useEffect(() => {
+    if (!modelName) {
+      setModelName(availableModels[0]);
+    }
+  }, [modelName, availableModels, setModelName]);
 
   const onSend = useCallback(() => {
-    postChat(content);
+    postChat(
+      content,
+      false,
+      chatPrompt.supportedModels.find((m) => m.modelName === modelName)
+    );
     setContent('');
-
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [content]);
+  }, [modelName, content]);
 
   const onReset = useCallback(() => {
     clear();
@@ -96,6 +117,22 @@ const ChatPage: React.FC = () => {
         <div className="invisible my-0 flex h-0 items-center justify-center text-xl font-semibold print:visible print:my-5 print:h-min lg:visible lg:my-5 lg:h-min">
           {title}
         </div>
+
+        {availableModels.length > 1 && (
+          <div className="flex w-full items-end justify-center">
+            <SelectField
+              label="モデル"
+              labelHidden
+              value={modelName}
+              onChange={(e) => setModelName(e.target.value)}>
+              {availableModels.map((m) => (
+                <option key={m} value={m}>
+                  {m}
+                </option>
+              ))}
+            </SelectField>
+          </div>
+        )}
 
         {((isEmpty && !loadingMessages) || loadingMessages) && (
           <div className="relative flex h-[calc(100vh-9rem)] flex-col items-center justify-center">
